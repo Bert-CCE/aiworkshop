@@ -24,6 +24,9 @@
 /*          This .W file was created with the Progress AppBuilder.      */
 /*----------------------------------------------------------------------*/
 
+USING business.ItemEntity.
+USING business.EntityFactory.
+
 /* Create an unnamed pool to store all the widgets created 
      by this procedure. This is a good default which assures
      that this procedure's triggers and internal procedures 
@@ -33,8 +36,6 @@
 CREATE WIDGET-POOL.
 
 /* ***************************  Definitions  ************************** */
-USING business.ItemEntity.
-USING business.EntityFactory.
 
 {business/ItemDataset.i}
 
