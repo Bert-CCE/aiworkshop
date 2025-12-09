@@ -1,7 +1,6 @@
 &ANALYZE-SUSPEND _VERSION-NUMBER AB_v10r12 GUI
 &ANALYZE-RESUME
 /* Connected Databases 
-          sports           PROGRESS
 */
 &Scoped-define WINDOW-NAME C-Win
 &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS C-Win 
@@ -34,6 +33,11 @@
 CREATE WIDGET-POOL.
 
 /* ***************************  Definitions  ************************** */
+USING business.ItemEntity.
+USING business.EntityFactory.
+
+{business/ItemDataset.i}
+
 
 /* Parameters Definitions ---                                           */
 
@@ -54,13 +58,13 @@ CREATE WIDGET-POOL.
 &Scoped-define FRAME-NAME DEFAULT-FRAME
 
 /* Internal Tables (found by Frame, Query & Browse Queries)             */
-&Scoped-define INTERNAL-TABLES Item
+&Scoped-define INTERNAL-TABLES ttItem
 
 /* Definitions for FRAME DEFAULT-FRAME                                  */
-&Scoped-define QUERY-STRING-DEFAULT-FRAME FOR EACH Item SHARE-LOCK
-&Scoped-define OPEN-QUERY-DEFAULT-FRAME OPEN QUERY DEFAULT-FRAME FOR EACH Item SHARE-LOCK.
-&Scoped-define TABLES-IN-QUERY-DEFAULT-FRAME Item
-&Scoped-define FIRST-TABLE-IN-QUERY-DEFAULT-FRAME Item
+&Scoped-define QUERY-STRING-DEFAULT-FRAME FOR EACH ttItem SHARE-LOCK
+&Scoped-define OPEN-QUERY-DEFAULT-FRAME OPEN QUERY DEFAULT-FRAME FOR EACH ttItem SHARE-LOCK.
+&Scoped-define TABLES-IN-QUERY-DEFAULT-FRAME ttItem
+&Scoped-define FIRST-TABLE-IN-QUERY-DEFAULT-FRAME ttItem
 
 
 /* Standard List Definitions                                            */
@@ -103,7 +107,7 @@ DEFINE VARIABLE FILL-IN_Price AS DECIMAL FORMAT "->,>>>,>>9.99" INITIAL 0
 /* Query definitions                                                    */
 &ANALYZE-SUSPEND
 DEFINE QUERY DEFAULT-FRAME FOR 
-      Item SCROLLING.
+      ttItem SCROLLING.
 &ANALYZE-RESUME
 
 /* ************************  Frame Definitions  *********************** */
@@ -217,11 +221,19 @@ END.
 &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL BUTTON-3 C-Win
 ON CHOOSE OF BUTTON-3 IN FRAME DEFAULT-FRAME /* Get Item */
 DO:
+  VAR EntityFactory objFactory = EntityFactory:GetInstance().
+  VAR ItemEntity objItemEntity = objFactory:GetItemEntity().
+  VAR LOGICAL lFound.
+
   ASSIGN FILL-IN_ItemNum. 
-  FIND FIRST Item WHERE Item.ItemNum = INTEGER(FILL-IN_ItemNum) NO-LOCK NO-ERROR.
-  IF AVAILABLE Item THEN
+  
+  /* Call entity to fetch data */
+  lFound = objItemEntity:GetItemByNum(INTEGER(FILL-IN_ItemNum), OUTPUT DATASET dsItem).
+
+  IF lFound THEN
   DO:
-     FILL-IN_Price = Item.Price.
+     FIND FIRST ttItem.
+     FILL-IN_Price = ttItem.Price.
      DISPLAY FILL-IN_Price WITH FRAME {&frame-name}.
   END.
   ELSE
@@ -237,24 +249,35 @@ END.
 &ANALYZE-SUSPEND _UIB-CODE-BLOCK _CONTROL BUTTON-4 C-Win
 ON CHOOSE OF BUTTON-4 IN FRAME DEFAULT-FRAME /* Save */
 DO:
-  VAR DECIMAL dTotal.
-  FIND FIRST Item WHERE Item.ItemNum = INTEGER(FILL-IN_ItemNum) EXCLUSIVE-LOCK NO-ERROR.
-  IF AVAILABLE Item THEN
+  VAR EntityFactory objFactory = EntityFactory:GetInstance().
+  VAR ItemEntity objItemEntity = objFactory:GetItemEntity().
+  VAR LOGICAL lFound.
+  VAR LOGICAL lValid.
+  VAR CHARACTER cMessage.
+
+  /* First get the item again to ensure we have latest and lock it (logic inside entity ideally, but here we just need to update) */
+  /* Actually, to update, we should populate ttItem and call UpdateItem */
+  
+  ASSIGN FILL-IN_ItemNum FILL-IN_Price.
+  
+  /* We need to fetch the item first to have the record in ttItem */
+  lFound = objItemEntity:GetItemByNum(INTEGER(FILL-IN_ItemNum), OUTPUT DATASET dsItem).
+  
+  IF lFound THEN
   DO:
-     ASSIGN FILL-IN_Price.
-     IF FILL-IN_Price = 0 THEN
-     DO:
-         MESSAGE 'Price cannot be empty' VIEW-AS ALERT-BOX.
-         RETURN NO-APPLY. 
+     FIND FIRST ttItem.
+     ttItem.Price = FILL-IN_Price.
+     
+     /* Validate */
+     lValid = objItemEntity:ValidateItem(INPUT-OUTPUT DATASET dsItem, OUTPUT cMessage).
+     
+     IF NOT lValid THEN DO:
+        MESSAGE cMessage VIEW-AS ALERT-BOX.
+        RETURN NO-APPLY.
      END.
-     dTotal = Item.OnHand * FILL-IN_Price.
-     IF dTotal > 6000 THEN
-     DO:
-         MESSAGE 'Total value onhand will be ' dTotal 
-                 ', should not be larger than 6000' VIEW-AS ALERT-BOX.
-         RETURN NO-APPLY.
-     END.
-     Item.Price = FILL-IN_Price.    
+     
+     /* Update */
+     objItemEntity:UpdateItem(INPUT-OUTPUT DATASET dsItem).
   END.
   ELSE
      MESSAGE 'Item not found' VIEW-AS ALERT-BOX.

@@ -27,7 +27,7 @@
   ],
   "dbConnections": [{
     "name": "sp2k",
-    "connect": "-db db/sports2000 -ld sp2k",
+    "connect": "-db sports2000 -ld sp2k -S 12345",
     "schemaFile": "dump/sports2000.df",
     "aliases": [
       "sports"
